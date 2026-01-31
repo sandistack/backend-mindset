@@ -10,6 +10,32 @@ Dokumentasi ini dirancang untuk programmer yang ingin mempelajari Go dari dasar 
 
 ---
 
+
+## Struktur:
+
+```ch
+go/docs/
+├── README.md                    ← Index + Learning Path
+├── 01-fundamentals/
+│   ├── GETTING_STARTED.md      ← Basics, syntax, types
+│   ├── ARCHITECTURE.md         ← Project structure
+│   ├── INTERFACES.md           ← Interface patterns
+│   └── HTTP_API.md             ← Gin framework, REST
+├── 02-database/
+│   ├── DATABASE.md             ← GORM, transactions
+│   └── PAGINATION.md           ← Pagination patterns
+├── 03-authentication/
+│   ├── AUTH.md                 ← JWT, bcrypt, RBAC
+│   └── SECURITY.md             ← Security best practices
+├── 04-advanced/
+│   └── CONCURRENCY.md          ← Goroutines, channels
+├── 05-testing/
+│   └── TESTS.md                ← Testing patterns
+└── 06-operations/
+    ├── LOGGING.md              ← Structured logging
+    └── DEPLOYMENT.md           ← Docker, K8s, CI/CD
+```
+
 ## 📖 Daftar Dokumentasi
 
 ### 📁 01-fundamentals/ - Dasar-dasar Go

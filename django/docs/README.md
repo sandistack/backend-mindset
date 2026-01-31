@@ -3,7 +3,35 @@
 Dokumentasi lengkap Django & Django REST Framework dari Junior hingga Senior level. Setiap file mengikuti progression: **Junior → Mid → Mid-Senior → Senior → Expert**.
 
 ---
+## Strukture:
 
+```ch
+django/docs/
+├── README.md                    ← Index lengkap
+├── 01-fundamentals/             ← 4 files
+│   ├── ARCHITECTURE.md          ← NEW! 🔥
+│   ├── RESPONSE_SCHEMA.md
+│   ├── ERROR_HANDLING.md
+│   └── MIDDLEWARE.md
+├── 02-database/                 ← 3 files
+│   ├── PAGINATION.md
+│   ├── FILTERING_SEARCH.md
+│   └── SERIALIZERS.md
+├── 03-authentication/           ← 2 files
+│   ├── GROUPS.md
+│   └── SECURITY.md
+├── 04-advanced/                 ← 4 files
+│   ├── CACHING.md
+│   ├── BACKGROUND_JOBS.md       ← NEW! 🔥
+│   ├── WEBSOCKET.md             ← NEW! 🔥
+│   └── DECORATOR.md
+├── 05-testing/                  ← 1 file
+│   └── TESTS.md
+└── 06-operations/               ← 3 files
+    ├── LOG.md
+    ├── DEPLOYMENT.md
+    └── TIPS.md
+```
 ## 📖 Table of Contents
 
 ### 01. Fundamentals
