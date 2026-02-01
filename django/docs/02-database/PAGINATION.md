@@ -546,11 +546,579 @@ class AdminTaskListView(APIView):
 
 ---
 
+---
+
+## 7️⃣ EXPERT LEVEL - Advanced Pagination Patterns
+
+### A) Keyset Pagination (Faster than Cursor)
+
+Keyset pagination menggunakan WHERE clause alih-alih OFFSET, sangat cepat untuk dataset besar.
+
+```python
+# apps/core/pagination.py
+from rest_framework.pagination import BasePagination
+from rest_framework.response import Response
+from base64 import b64encode, b64decode
+import json
+
+class KeysetPagination(BasePagination):
+    """
+    Keyset-based pagination untuk dataset sangat besar (10M+ records)
+    
+    Prinsip:
+    - Gunakan WHERE id > last_id alih-alih OFFSET
+    - O(1) complexity, tidak peduli di page berapa
+    """
+    page_size = 20
+    
+    def paginate_queryset(self, queryset, request, view=None):
+        self.request = request
+        self.queryset = queryset
+        
+        # Decode cursor
+        after_cursor = request.query_params.get('after')
+        before_cursor = request.query_params.get('before')
+        
+        if after_cursor:
+            # Decode: {"id": 123, "created_at": "2024-01-01"}
+            decoded = json.loads(b64decode(after_cursor).decode())
+            queryset = queryset.filter(
+                id__gt=decoded['id']
+            )
+        elif before_cursor:
+            decoded = json.loads(b64decode(before_cursor).decode())
+            queryset = queryset.filter(
+                id__lt=decoded['id']
+            ).order_by('-id')
+        
+        # Get one extra to check has_next
+        results = list(queryset[:self.page_size + 1])
+        
+        self.has_next = len(results) > self.page_size
+        self.has_prev = bool(after_cursor)
+        
+        if self.has_next:
+            results = results[:self.page_size]
+        
+        self.results = results
+        return results
+    
+    def _encode_cursor(self, item):
+        """Encode cursor dari object"""
+        data = {
+            'id': item.id,
+            'created_at': str(item.created_at)
+        }
+        return b64encode(json.dumps(data).encode()).decode()
+    
+    def get_paginated_response(self, data):
+        return Response({
+            "success": True,
+            "data": data,
+            "pagination": {
+                "has_next": self.has_next,
+                "has_prev": self.has_prev,
+                "next_cursor": self._encode_cursor(self.results[-1]) if self.has_next and self.results else None,
+                "prev_cursor": self._encode_cursor(self.results[0]) if self.has_prev and self.results else None
+            }
+        })
+```
+
+### B) Composite Cursor (Multi-Field Sorting)
+
+Untuk sorting dengan multiple fields (created_at DESC, id DESC).
+
+```python
+# apps/core/pagination.py
+class CompositeCursorPagination(BasePagination):
+    """
+    Cursor pagination dengan composite key
+    Untuk: ORDER BY created_at DESC, id DESC
+    """
+    page_size = 20
+    ordering = ['-created_at', '-id']
+    
+    def paginate_queryset(self, queryset, request, view=None):
+        self.request = request
+        cursor = request.query_params.get('cursor')
+        
+        if cursor:
+            decoded = json.loads(b64decode(cursor).decode())
+            # Composite WHERE: created_at < X OR (created_at = X AND id < Y)
+            from django.db.models import Q
+            queryset = queryset.filter(
+                Q(created_at__lt=decoded['created_at']) |
+                Q(created_at=decoded['created_at'], id__lt=decoded['id'])
+            )
+        
+        queryset = queryset.order_by('-created_at', '-id')
+        results = list(queryset[:self.page_size + 1])
+        
+        self.has_next = len(results) > self.page_size
+        if self.has_next:
+            results = results[:self.page_size]
+        
+        self.results = results
+        return results
+    
+    def _encode_cursor(self, item):
+        return b64encode(json.dumps({
+            'created_at': item.created_at.isoformat(),
+            'id': item.id
+        }).encode()).decode()
+    
+    def get_paginated_response(self, data):
+        next_cursor = None
+        if self.has_next and self.results:
+            next_cursor = self._encode_cursor(self.results[-1])
+        
+        return Response({
+            "success": True,
+            "data": data,
+            "pagination": {
+                "next": next_cursor,
+                "has_more": self.has_next
+            }
+        })
+```
+
+### C) Cached Pagination (Redis)
+
+Cache pagination results untuk frequently accessed endpoints.
+
+```python
+# apps/core/pagination.py
+from django.core.cache import cache
+import hashlib
+
+class CachedPagination(PageNumberPagination):
+    """
+    Cache paginated results di Redis
+    
+    Use case:
+    - Homepage feed (accessed by many users)
+    - Leaderboard (same for everyone)
+    - Category listing
+    """
+    page_size = 20
+    cache_timeout = 60  # 1 minute
+    
+    def paginate_queryset(self, queryset, request, view=None):
+        # Generate cache key
+        cache_key = self._get_cache_key(request, view)
+        
+        # Try cache first
+        cached = cache.get(cache_key)
+        if cached:
+            self.page = cached['page']
+            self.count = cached['count']
+            return cached['data']
+        
+        # If not cached, paginate normally
+        results = super().paginate_queryset(queryset, request, view)
+        
+        # Cache the results
+        cache.set(cache_key, {
+            'data': results,
+            'page': self.page,
+            'count': self.page.paginator.count
+        }, self.cache_timeout)
+        
+        return results
+    
+    def _get_cache_key(self, request, view):
+        """Generate unique cache key"""
+        params = request.query_params.dict()
+        params_str = json.dumps(params, sort_keys=True)
+        hash_key = hashlib.md5(params_str.encode()).hexdigest()
+        
+        view_name = view.__class__.__name__ if view else 'unknown'
+        return f"pagination:{view_name}:{hash_key}"
+```
+
+### D) Async Pagination (Django 4.1+)
+
+Untuk async views dengan database async.
+
+```python
+# apps/core/pagination.py
+from asgiref.sync import sync_to_async
+
+class AsyncPagination(PageNumberPagination):
+    """
+    Async-compatible pagination untuk Django 4.1+ async views
+    """
+    
+    async def apaginate_queryset(self, queryset, request, view=None):
+        """Async version of paginate_queryset"""
+        self.request = request
+        
+        page_number = request.query_params.get('page', 1)
+        page_size = self.get_page_size(request)
+        
+        # Async count
+        count = await queryset.acount()
+        
+        # Calculate offset
+        offset = (int(page_number) - 1) * page_size
+        
+        # Async slice
+        results = [item async for item in queryset[offset:offset + page_size]]
+        
+        self._count = count
+        self._page_number = int(page_number)
+        self._page_size = page_size
+        
+        return results
+    
+    def get_paginated_response(self, data):
+        return Response({
+            "success": True,
+            "data": data,
+            "pagination": {
+                "count": self._count,
+                "page": self._page_number,
+                "page_size": self._page_size,
+                "total_pages": (self._count + self._page_size - 1) // self._page_size
+            }
+        })
+
+
+# Usage in async view
+class AsyncTaskListView(APIView):
+    async def get(self, request):
+        queryset = Task.objects.filter(user=request.user)
+        
+        paginator = AsyncPagination()
+        paginated = await paginator.apaginate_queryset(queryset, request)
+        
+        serializer = TaskSerializer(paginated, many=True)
+        return paginator.get_paginated_response(serializer.data)
+```
+
+---
+
+## 8️⃣ EXPERT LEVEL - Pagination Caching Strategies
+
+### Strategy 1: Count Cache
+
+Count query bisa slow untuk large tables. Cache it!
+
+```python
+# apps/core/pagination.py
+class CachedCountPagination(PageNumberPagination):
+    """
+    Cache COUNT(*) query yang expensive
+    """
+    page_size = 20
+    count_cache_timeout = 300  # 5 minutes
+    
+    def paginate_queryset(self, queryset, request, view=None):
+        self.request = request
+        
+        # Get count from cache or database
+        cache_key = f"count:{queryset.query}"
+        count = cache.get(cache_key)
+        
+        if count is None:
+            count = queryset.count()
+            cache.set(cache_key, count, self.count_cache_timeout)
+        
+        # Store for response
+        self._cached_count = count
+        
+        # Paginate
+        page_number = request.query_params.get('page', 1)
+        page_size = self.get_page_size(request)
+        offset = (int(page_number) - 1) * page_size
+        
+        return list(queryset[offset:offset + page_size])
+    
+    def get_paginated_response(self, data):
+        return Response({
+            "success": True,
+            "data": data,
+            "pagination": {
+                "count": self._cached_count,
+                # ... rest
+            }
+        })
+```
+
+### Strategy 2: Infinite Scroll Optimization
+
+```python
+# apps/tasks/views.py
+class InfiniteScrollTasksView(APIView):
+    """
+    Optimized for mobile infinite scroll
+    
+    Features:
+    - Cursor-based (no duplicates)
+    - Preload next batch
+    - Include has_more flag
+    """
+    
+    def get(self, request):
+        queryset = Task.objects.filter(
+            user=request.user
+        ).select_related('user').prefetch_related('tags')
+        
+        cursor = request.query_params.get('cursor')
+        limit = int(request.query_params.get('limit', 20))
+        
+        if cursor:
+            # Decode cursor (id of last item)
+            last_id = int(b64decode(cursor).decode())
+            queryset = queryset.filter(id__lt=last_id)
+        
+        # Fetch limit + 1 to check has_more
+        items = list(queryset.order_by('-id')[:limit + 1])
+        has_more = len(items) > limit
+        
+        if has_more:
+            items = items[:limit]
+        
+        serializer = TaskSerializer(items, many=True)
+        
+        return Response({
+            "success": True,
+            "data": serializer.data,
+            "pagination": {
+                "has_more": has_more,
+                "next_cursor": b64encode(str(items[-1].id).encode()).decode() if items else None,
+                "count": len(items)
+            }
+        })
+```
+
+---
+
+## 9️⃣ Performance Optimization Deep Dive
+
+### Index Strategy untuk Pagination
+
+```python
+# apps/tasks/models.py
+class Task(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    title = models.CharField(max_length=255)
+    status = models.CharField(max_length=20)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        indexes = [
+            # Single column untuk simple ordering
+            models.Index(fields=['-created_at']),
+            
+            # Composite untuk filtered + ordered queries
+            # WHERE user_id = X ORDER BY created_at DESC
+            models.Index(fields=['user', '-created_at']),
+            
+            # Untuk cursor pagination
+            # WHERE id > X ORDER BY id
+            models.Index(fields=['id']),
+            
+            # Untuk complex filtering
+            # WHERE status = X AND user_id = Y ORDER BY created_at DESC
+            models.Index(fields=['status', 'user', '-created_at']),
+        ]
+
+
+# Migration untuk covering index (PostgreSQL)
+class Migration(migrations.Migration):
+    operations = [
+        migrations.RunSQL(
+            # Covering index: includes all columns needed by query
+            # Avoids table lookup
+            sql="""
+            CREATE INDEX task_list_covering ON tasks_task (
+                user_id, created_at DESC
+            ) INCLUDE (id, title, status);
+            """,
+            reverse_sql="DROP INDEX task_list_covering;"
+        )
+    ]
+```
+
+### Query Optimization
+
+```python
+# ❌ Bad: Multiple queries
+class TaskListView(APIView):
+    def get(self, request):
+        tasks = Task.objects.filter(user=request.user)  # Query 1
+        # Dalam serializer, akses task.user.name = Query per task!
+
+# ✅ Good: Single optimized query
+class TaskListView(APIView):
+    def get(self, request):
+        tasks = Task.objects.filter(
+            user=request.user
+        ).select_related(
+            'user',          # FK relations
+            'category'
+        ).prefetch_related(
+            'tags',          # M2M relations
+            'comments',
+            Prefetch(
+                'attachments',
+                queryset=Attachment.objects.only('id', 'filename')
+            )
+        ).only(              # Only needed fields
+            'id', 'title', 'status', 'created_at',
+            'user__username', 'category__name'
+        ).order_by('-created_at')
+        
+        # Paginate optimized queryset
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(tasks, request)
+        serializer = TaskSerializer(page, many=True)
+        
+        return paginator.get_paginated_response(serializer.data)
+```
+
+### Deferred Count (Skip count for infinite scroll)
+
+```python
+class NoCoundPagination(CursorPagination):
+    """
+    Pagination tanpa COUNT query
+    Cocok untuk infinite scroll dimana total tidak penting
+    """
+    page_size = 20
+    
+    def get_paginated_response(self, data):
+        return Response({
+            "success": True,
+            "data": data,
+            "pagination": {
+                "next": self.get_next_link(),
+                "previous": self.get_previous_link(),
+                # No count - faster!
+            }
+        })
+```
+
+---
+
+## 🔟 Frontend Integration Patterns
+
+### React with React Query
+
+```javascript
+// hooks/useTasks.js
+import { useInfiniteQuery } from '@tanstack/react-query';
+
+export function useTasks() {
+    return useInfiniteQuery({
+        queryKey: ['tasks'],
+        queryFn: async ({ pageParam = null }) => {
+            const url = pageParam 
+                ? `/api/tasks/?cursor=${pageParam}`
+                : '/api/tasks/';
+            
+            const res = await fetch(url);
+            return res.json();
+        },
+        getNextPageParam: (lastPage) => {
+            return lastPage.pagination.next_cursor;
+        },
+        getPreviousPageParam: (firstPage) => {
+            return firstPage.pagination.prev_cursor;
+        }
+    });
+}
+
+// components/TaskList.jsx
+function TaskList() {
+    const {
+        data,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage
+    } = useTasks();
+    
+    return (
+        <div>
+            {data?.pages.map(page =>
+                page.data.map(task => (
+                    <TaskCard key={task.id} task={task} />
+                ))
+            )}
+            
+            {hasNextPage && (
+                <button 
+                    onClick={() => fetchNextPage()}
+                    disabled={isFetchingNextPage}
+                >
+                    {isFetchingNextPage ? 'Loading...' : 'Load More'}
+                </button>
+            )}
+        </div>
+    );
+}
+```
+
+### Intersection Observer (Infinite Scroll)
+
+```javascript
+// hooks/useInfiniteScroll.js
+import { useEffect, useRef, useCallback } from 'react';
+
+export function useInfiniteScroll(callback, hasMore) {
+    const observer = useRef();
+    
+    const lastElementRef = useCallback(node => {
+        if (observer.current) observer.current.disconnect();
+        
+        observer.current = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && hasMore) {
+                callback();
+            }
+        });
+        
+        if (node) observer.current.observe(node);
+    }, [callback, hasMore]);
+    
+    return lastElementRef;
+}
+
+// Usage
+function TaskList() {
+    const { data, fetchNextPage, hasNextPage } = useTasks();
+    const lastTaskRef = useInfiniteScroll(fetchNextPage, hasNextPage);
+    
+    return (
+        <div>
+            {data?.pages.map((page, i) =>
+                page.data.map((task, j) => {
+                    const isLast = i === data.pages.length - 1 && 
+                                   j === page.data.length - 1;
+                    return (
+                        <div 
+                            key={task.id} 
+                            ref={isLast ? lastTaskRef : null}
+                        >
+                            <TaskCard task={task} />
+                        </div>
+                    );
+                })
+            )}
+        </div>
+    );
+}
+```
+
+---
+
 ## 📚 Further Reading
 
 - [DRF Pagination Docs](https://www.django-rest-framework.org/api-guide/pagination/)
 - [Database Indexing Best Practices](https://use-the-index-luke.com/)
 - [Cursor-based Pagination Deep Dive](https://www.sitepoint.com/paginating-real-time-data-cursor-based-pagination/)
+- [Slack Engineering: Scaling Pagination](https://slack.engineering/)
+- [PostgreSQL Index Types](https://www.postgresql.org/docs/current/indexes-types.html)
 
 ---
 
@@ -569,4 +1137,54 @@ queryset.count()  # Fast
 
 # Tip 4: Prefetch related data
 Task.objects.prefetch_related('tags')  # For ManyToMany
+
+# Tip 5: Estimated count untuk large tables
+# Faster than COUNT(*) untuk estimation
+from django.db import connection
+with connection.cursor() as cursor:
+    cursor.execute("""
+        SELECT reltuples::BIGINT 
+        FROM pg_class 
+        WHERE relname = 'tasks_task'
+    """)
+    estimated_count = cursor.fetchone()[0]
+
+# Tip 6: Pagination info di headers (REST convention)
+class HeaderPagination(PageNumberPagination):
+    def get_paginated_response(self, data):
+        response = Response(data)
+        response['X-Total-Count'] = self.page.paginator.count
+        response['X-Page'] = self.page.number
+        response['X-Page-Size'] = self.page_size
+        response['Link'] = self._get_link_header()
+        return response
 ```
+
+---
+
+## 📋 Complete Pagination Checklist
+
+### Junior ✅
+- [ ] Implement basic PageNumberPagination
+- [ ] Custom page size
+- [ ] Consistent response schema
+
+### Mid ✅  
+- [ ] Choose right pagination type per use case
+- [ ] LimitOffsetPagination untuk load more
+- [ ] CursorPagination untuk infinite scroll
+
+### Senior ✅
+- [ ] Per-view pagination configuration
+- [ ] Database index optimization
+- [ ] select_related/prefetch_related
+
+### Expert ✅
+- [ ] Keyset pagination untuk 1M+ records
+- [ ] Composite cursors untuk multi-field ordering
+- [ ] Cached pagination dengan Redis
+- [ ] Async pagination (Django 4.1+)
+- [ ] Count cache strategy
+- [ ] Covering indexes
+- [ ] Frontend integration (React Query)
+- [ ] Infinite scroll dengan Intersection Observer
