@@ -28,11 +28,13 @@ INSTALLED_APPS = [
     # Third party apps
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'django_filters',
     'corsheaders',
     'drf_spectacular',
     
-    # Local appsk    'apps.core',
+    # Local apps
+    'apps.core',
     'apps.authentication',
     'apps.tasks',
 ]
@@ -116,8 +118,8 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-# Custom User Model (akan dibuat di step 2)
-# AUTH_USER_MODEL = 'authentication.User'
+# Custom User Model
+AUTH_USER_MODEL = 'authentication.User'
 
 
 # REST Framework Configuration
