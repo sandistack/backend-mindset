@@ -6,3 +6,10 @@ django-cors-headers>=4.0
 python-dotenv>=1.0
 psycopg2-binary>=2.9  # untuk PostgreSQL
 drf-spectacular>=0.26  # API documentation
+
+# Testing
+pytest>=7.4
+pytest-django>=4.5
+pytest-cov>=4.1
+factory-boy>=3.3
+faker>=20.0
