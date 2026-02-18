@@ -55,7 +55,72 @@ Midtrans/Stripe (payment gateway)
 
 ---
 
-## 📊 Database Schema
+## � Quick Start
+
+### Prerequisites
+- Python 3.12+
+- PostgreSQL 15
+- Redis 7
+- Docker & Docker Compose
+
+### Installation
+
+1. **Clone dan masuk ke direktori project**
+```bash
+cd /path/to/02-mid-ecommerce-api
+```
+
+2. **Activate virtual environment**
+```bash
+source venv/bin/activate  # Linux/Mac
+# atau
+venv\Scripts\activate  # Windows
+```
+
+3. **Start Docker services (PostgreSQL, Redis, MinIO)**
+```bash
+docker compose up -d
+```
+
+4. **Check Docker services status**
+```bash
+docker compose ps
+```
+
+5. **Run migrations**
+```bash
+python manage.py migrate
+```
+
+6. **Create superuser**
+```bash
+python manage.py createsuperuser
+```
+
+7. **Run development server**
+```bash
+python manage.py runserver
+```
+
+8. **Run Celery worker (Terminal 2)**
+```bash
+celery -A config worker -l info
+```
+
+9. **Run Celery beat (Terminal 3)**
+```bash
+celery -A config beat -l info
+```
+
+### Access Points
+- **API**: http://localhost:8000/
+- **Admin Panel**: http://localhost:8000/admin/
+- **API Documentation**: http://localhost:8000/api/schema/swagger-ui/
+- **MinIO Console**: http://localhost:9001/ (minioadmin/minioadmin)
+
+---
+
+## �📊 Database Schema
 
 ```
 ┌─────────────┐       ┌─────────────┐       ┌─────────────┐
