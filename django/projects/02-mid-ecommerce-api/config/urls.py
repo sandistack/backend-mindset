@@ -38,8 +38,8 @@ urlpatterns = [
     path('api/', include('apps.products.urls')),  # Products API
     path('api/', include('apps.cart.urls')),  # Cart API
     path('api/', include('apps.orders.urls')),  # Orders API
+    path('api/', include('apps.reports.urls')),  # Reports API
     # path('api/payments/', include('apps.payments.urls')),
-    # path('api/reports/', include('apps.reports.urls')),
 ]
 
 # Serve media files in development
