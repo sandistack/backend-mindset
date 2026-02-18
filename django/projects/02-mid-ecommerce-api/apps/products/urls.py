@@ -22,4 +22,15 @@ urlpatterns = [
     
     # Admin endpoints (IsAdminUser required)
     path('admin/', include(admin_router.urls)),
+    
+    # Image upload endpoints
+    path('admin/products/<int:product_id>/upload-image/', 
+         views.ProductImageUploadView.as_view(), 
+         name='product-image-upload'),
+    path('admin/products/<int:product_id>/images/<int:image_id>/', 
+         views.ProductImageUploadView.as_view(), 
+         name='product-image-delete'),
+    path('admin/products/<int:product_id>/images/reorder/', 
+         views.ProductImageReorderView.as_view(), 
+         name='product-image-reorder'),
 ]

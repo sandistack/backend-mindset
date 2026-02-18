@@ -34,6 +34,31 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 # File Storage - Use S3
 USE_S3 = True
 
+# AWS S3 Configuration (for media files)
+if USE_S3:
+    # AWS credentials
+    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+    AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_BUCKET')
+    AWS_S3_REGION_NAME = os.getenv('AWS_REGION', 'ap-southeast-1')
+    
+    # S3 settings
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_DEFAULT_ACL = None  # Use bucket's ACL
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
+    AWS_QUERYSTRING_AUTH = True  # Use presigned URLs
+    AWS_QUERYSTRING_EXPIRE = 3600  # 1 hour
+    
+    # Use S3 for media files
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    
+    # Custom domain (if using CloudFront)
+    # AWS_S3_CUSTOM_DOMAIN = os.getenv('AWS_CLOUDFRONT_DOMAIN')
+else:
+    # Fallback to local storage
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR.parent / 'media'
+
 # Logging
 LOGGING = {
     'version': 1,
