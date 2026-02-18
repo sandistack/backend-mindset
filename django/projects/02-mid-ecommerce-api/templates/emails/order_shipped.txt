@@ -1,0 +1,25 @@
+{{ site_name }}
+
+Your Order Has Been Shipped!
+
+Hi {{ user.first_name }},
+
+Good news! Your order has been shipped and is on its way to you.
+
+Order Number: {{ order.order_number }}
+Shipped Date: {{ order.shipped_at|date:"F d, Y" }}
+{% if tracking_number %}Tracking Number: {{ tracking_number }}{% endif %}
+
+Your package should arrive within 3-7 business days.
+
+SHIPPING TO:
+{{ order.shipping_name }}
+{{ order.shipping_address }}
+{{ order.shipping_city }} {{ order.shipping_postal_code }}
+Phone: {{ order.shipping_phone }}
+
+Track your order: {{ base_url }}/orders/{{ order.id }}
+
+Need help? Contact us at support@yourstore.com
+
+© {% now "Y" %} {{ site_name }}. All rights reserved.

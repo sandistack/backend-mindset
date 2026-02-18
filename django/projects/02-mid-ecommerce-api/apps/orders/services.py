@@ -6,6 +6,11 @@ from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from .models import Order, OrderItem
+from .tasks import (
+    send_order_confirmation_email,
+    send_payment_confirmation_email,
+    send_shipping_notification_email,
+)
 
 
 class OrderService:
@@ -70,6 +75,9 @@ class OrderService:
         cart.discount = None
         cart.save()
         
+        # Send order confirmation email (async)
+        send_order_confirmation_email.delay(order.id)
+        
         return order
     
     @staticmethod
@@ -108,9 +116,13 @@ class OrderService:
         # Update status with appropriate timestamps
         if new_status == 'paid':
             order.mark_paid()
+            # Send payment confirmation email
+            send_payment_confirmation_email.delay(order.id)
         elif new_status == 'shipped':
             tracking_number = kwargs.get('tracking_number', '')
             order.mark_shipped(tracking_number)
+            # Send shipping notification email
+            send_shipping_notification_email.delay(order.id, tracking_number)
         elif new_status == 'completed':
             order.mark_completed()
         elif new_status == 'cancelled':

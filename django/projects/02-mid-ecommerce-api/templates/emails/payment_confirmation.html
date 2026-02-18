@@ -1,0 +1,56 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2 style="color: #333; margin-top: 0;">Payment Received ✅</h2>
+
+<p>Hi {{ user.first_name }},</p>
+
+<p>We've received your payment and your order is now being processed!</p>
+
+<div class="info-box">
+    <p><strong>Order Number:</strong> {{ order.order_number }}</p>
+    <p><strong>Payment Date:</strong> {{ order.paid_at|date:"F d, Y" }}</p>
+    <p><strong>Amount Paid:</strong> <span style="color: #28a745; font-weight: 600;">Rp {{ order.total|floatformat:0 }}</span></p>
+</div>
+
+<h3 style="color: #333;">What's Next?</h3>
+<p>Your order is now being prepared for shipment. We'll send you another email with tracking information once your order ships.</p>
+
+<h3 style="color: #333;">Order Details</h3>
+
+<table class="order-table">
+    <thead>
+        <tr>
+            <th>Product</th>
+            <th style="text-align: center;">Qty</th>
+            <th style="text-align: right;">Price</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>
+                <strong>{{ item.product_name }}</strong><br>
+                <span style="color: #6c757d; font-size: 14px;">{{ item.variant_name }}</span>
+            </td>
+            <td style="text-align: center;">{{ item.quantity }}</td>
+            <td style="text-align: right;">Rp {{ item.subtotal|floatformat:0 }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+    <tfoot>
+        <tr class="total-row">
+            <td colspan="2">Total Paid</td>
+            <td style="text-align: right;">Rp {{ order.total|floatformat:0 }}</td>
+        </tr>
+    </tfoot>
+</table>
+
+<div style="text-align: center;">
+    <a href="{{ base_url }}/orders/{{ order.id }}" class="button">View Order</a>
+</div>
+
+<p style="margin-top: 30px; color: #6c757d; font-size: 14px;">
+    Thank you for shopping with us!
+</p>
+{% endblock %}

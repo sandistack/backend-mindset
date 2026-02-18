@@ -1,0 +1,27 @@
+{{ site_name }}
+
+Payment Received
+
+Hi {{ user.first_name }},
+
+We've received your payment and your order is now being processed!
+
+Order Number: {{ order.order_number }}
+Payment Date: {{ order.paid_at|date:"F d, Y" }}
+Amount Paid: Rp {{ order.total|floatformat:0 }}
+
+WHAT'S NEXT?
+Your order is now being prepared for shipment. We'll send you tracking information once your order ships.
+
+ORDER DETAILS
+{% for item in items %}
+- {{ item.product_name }} ({{ item.variant_name }}) x{{ item.quantity }} - Rp {{ item.subtotal|floatformat:0 }}
+{% endfor %}
+
+Total Paid: Rp {{ order.total|floatformat:0 }}
+
+View your order: {{ base_url }}/orders/{{ order.id }}
+
+Thank you for shopping with us!
+
+© {% now "Y" %} {{ site_name }}. All rights reserved.

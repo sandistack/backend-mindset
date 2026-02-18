@@ -1,0 +1,75 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2 style="color: #333; margin-top: 0;">Thank You for Your Order! 🎉</h2>
+
+<p>Hi {{ user.first_name }},</p>
+
+<p>We've received your order and it's being processed. We'll send you another email when your order ships.</p>
+
+<div class="info-box">
+    <p><strong>Order Number:</strong> {{ order.order_number }}</p>
+    <p><strong>Order Date:</strong> {{ order.created_at|date:"F d, Y" }}</p>
+    <p><strong>Order Status:</strong> {{ order.get_status_display }}</p>
+</div>
+
+<h3 style="color: #333;">Order Summary</h3>
+
+<table class="order-table">
+    <thead>
+        <tr>
+            <th>Product</th>
+            <th style="text-align: center;">Qty</th>
+            <th style="text-align: right;">Price</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>
+                <strong>{{ item.product_name }}</strong><br>
+                <span style="color: #6c757d; font-size: 14px;">{{ item.variant_name }}</span>
+            </td>
+            <td style="text-align: center;">{{ item.quantity }}</td>
+            <td style="text-align: right;">Rp {{ item.subtotal|floatformat:0 }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="2">Subtotal</td>
+            <td style="text-align: right;">Rp {{ order.subtotal|floatformat:0 }}</td>
+        </tr>
+        {% if order.discount_amount %}
+        <tr>
+            <td colspan="2">Discount</td>
+            <td style="text-align: right; color: #28a745;">-Rp {{ order.discount_amount|floatformat:0 }}</td>
+        </tr>
+        {% endif %}
+        <tr>
+            <td colspan="2">Shipping</td>
+            <td style="text-align: right;">Rp {{ order.shipping_cost|floatformat:0 }}</td>
+        </tr>
+        <tr class="total-row">
+            <td colspan="2">Total</td>
+            <td style="text-align: right;">Rp {{ order.total|floatformat:0 }}</td>
+        </tr>
+    </tfoot>
+</table>
+
+<h3 style="color: #333;">Shipping Address</h3>
+<div class="info-box">
+    <p><strong>{{ order.shipping_name }}</strong></p>
+    <p>{{ order.shipping_address }}</p>
+    <p>{{ order.shipping_city }} {{ order.shipping_postal_code }}</p>
+    <p>Phone: {{ order.shipping_phone }}</p>
+</div>
+
+<div style="text-align: center;">
+    <a href="{{ base_url }}/orders/{{ order.id }}" class="button">View Order Details</a>
+</div>
+
+<p style="margin-top: 30px; color: #6c757d; font-size: 14px;">
+    Need help? Feel free to contact our customer support team.
+</p>
+{% endblock %}

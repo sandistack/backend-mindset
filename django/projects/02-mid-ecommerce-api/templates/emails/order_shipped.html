@@ -1,0 +1,35 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<h2 style="color: #333; margin-top: 0;">Your Order Has Been Shipped! 📦</h2>
+
+<p>Hi {{ user.first_name }},</p>
+
+<p>Good news! Your order has been shipped and is on its way to you.</p>
+
+<div class="info-box">
+    <p><strong>Order Number:</strong> {{ order.order_number }}</p>
+    <p><strong>Shipped Date:</strong> {{ order.shipped_at|date:"F d, Y" }}</p>
+    {% if tracking_number %}
+    <p><strong>Tracking Number:</strong> <span style="color: #667eea; font-weight: 600;">{{ tracking_number }}</span></p>
+    {% endif %}
+</div>
+
+<p>Your package should arrive within 3-7 business days depending on your location.</p>
+
+<h3 style="color: #333;">Shipping To:</h3>
+<div class="info-box">
+    <p><strong>{{ order.shipping_name }}</strong></p>
+    <p>{{ order.shipping_address }}</p>
+    <p>{{ order.shipping_city }} {{ order.shipping_postal_code }}</p>
+    <p>Phone: {{ order.shipping_phone }}</p>
+</div>
+
+<div style="text-align: center;">
+    <a href="{{ base_url }}/orders/{{ order.id }}" class="button">Track Your Order</a>
+</div>
+
+<p style="margin-top: 30px; color: #6c757d; font-size: 14px;">
+    If you have any questions about your shipment, please contact our customer support.
+</p>
+{% endblock %}
