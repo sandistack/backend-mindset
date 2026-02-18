@@ -33,6 +33,10 @@ openpyxl>=3.1
 weasyprint>=60.0
 reportlab>=4.0
 
+# Payment Gateways
+midtransclient>=1.3
+stripe>=7.0
+
 # API Documentation
 drf-spectacular>=0.26
 

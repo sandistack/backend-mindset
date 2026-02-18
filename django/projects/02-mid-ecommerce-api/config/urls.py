@@ -39,7 +39,7 @@ urlpatterns = [
     path('api/', include('apps.cart.urls')),  # Cart API
     path('api/', include('apps.orders.urls')),  # Orders API
     path('api/', include('apps.reports.urls')),  # Reports API
-    # path('api/payments/', include('apps.payments.urls')),
+    path('api/', include('apps.payments.urls')),  # Payments API
 ]
 
 # Serve media files in development
