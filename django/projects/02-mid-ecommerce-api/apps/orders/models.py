@@ -5,7 +5,10 @@ Orders and Discount models.
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
+from django.conf import settings
 from decimal import Decimal
+import random
+import string
 
 
 class Discount(models.Model):
@@ -114,3 +117,132 @@ class Discount(models.Model):
         """Increment usage count."""
         self.used_count += 1
         self.save(update_fields=['used_count'])
+
+
+class Order(models.Model):
+    """
+    Order model with status management.
+    """
+    
+    STATUS_CHOICES = [
+        ('pending', 'Pending Payment'),
+        ('paid', 'Paid'),
+        ('processing', 'Processing'),
+        ('shipped', 'Shipped'),
+        ('delivered', 'Delivered'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='orders')
+    order_number = models.CharField(max_length=50, unique=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    
+    # Pricing
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2)
+    discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    shipping_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total = models.DecimalField(max_digits=12, decimal_places=2)
+    discount = models.ForeignKey(Discount, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    # Shipping info
+    shipping_name = models.CharField(max_length=100)
+    shipping_phone = models.CharField(max_length=20)
+    shipping_address = models.TextField()
+    shipping_city = models.CharField(max_length=100)
+    shipping_postal_code = models.CharField(max_length=10)
+    
+    # Additional info
+    notes = models.TextField(blank=True)
+    tracking_number = models.CharField(max_length=100, blank=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    shipped_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'orders'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['order_number']),
+            models.Index(fields=['status']),
+        ]
+    
+    def __str__(self):
+        return f"Order {self.order_number} - {self.user.email}"
+    
+    @staticmethod
+    def generate_order_number():
+        """Generate unique order number: ORD-YYYYMMDD-XXXX."""
+        date_str = timezone.now().strftime('%Y%m%d')
+        random_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+        order_number = f"ORD-{date_str}-{random_str}"
+        
+        # Ensure uniqueness
+        while Order.objects.filter(order_number=order_number).exists():
+            random_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+            order_number = f"ORD-{date_str}-{random_str}"
+        
+        return order_number
+    
+    def mark_paid(self):
+        """Mark order as paid."""
+        self.status = 'paid'
+        self.paid_at = timezone.now()
+        self.save(update_fields=['status', 'paid_at', 'updated_at'])
+    
+    def mark_shipped(self, tracking_number=''):
+        """Mark order as shipped."""
+        self.status = 'shipped'
+        self.shipped_at = timezone.now()
+        if tracking_number:
+            self.tracking_number = tracking_number
+        self.save(update_fields=['status', 'shipped_at', 'tracking_number', 'updated_at'])
+    
+    def mark_completed(self):
+        """Mark order as completed."""
+        self.status = 'completed'
+        self.completed_at = timezone.now()
+        self.save(update_fields=['status', 'completed_at', 'updated_at'])
+    
+    def cancel(self, reason=''):
+        """Cancel order."""
+        self.status = 'cancelled'
+        self.cancelled_at = timezone.now()
+        if reason:
+            self.notes = f"{self.notes}\n\nCancelled: {reason}".strip()
+        self.save(update_fields=['status', 'cancelled_at', 'notes', 'updated_at'])
+    
+    def can_cancel(self):
+        """Check if order can be cancelled."""
+        return self.status in ['pending', 'paid', 'processing']
+
+
+class OrderItem(models.Model):
+    """
+    Order item with snapshot data.
+    """
+    
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
+    variant = models.ForeignKey('products.ProductVariant', on_delete=models.PROTECT)
+    
+    # Snapshot data (in case product changes)
+    product_name = models.CharField(max_length=255)
+    variant_name = models.CharField(max_length=255)
+    price = models.DecimalField(max_digits=12, decimal_places=2)
+    quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2)
+    
+    class Meta:
+        db_table = 'order_items'
+        indexes = [
+            models.Index(fields=['order']),
+        ]
+    
+    def __str__(self):
+        return f"{self.product_name} - {self.variant_name} x{self.quantity}"
