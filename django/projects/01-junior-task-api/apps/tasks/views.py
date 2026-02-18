@@ -2,6 +2,8 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.filters import SearchFilter, OrderingFilter
+from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
 
 from .models import Category, Task
@@ -11,7 +13,9 @@ from .serializers import (
     TaskCreateUpdateSerializer,
     TaskDetailSerializer
 )
+from .filters import TaskFilter, CategoryFilter
 from apps.core.permissions import IsOwner
+from apps.core.pagination import CustomPagination
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -24,9 +28,27 @@ class CategoryViewSet(viewsets.ModelViewSet):
     update: Update category
     partial_update: Partial update category
     destroy: Delete category
+    
+    Filtering:
+    - ?name=work (case-insensitive contains)
+    - ?color=#EF4444 (exact match)
+    
+    Search:
+    - ?search=work (searches in name)
+    
+    Ordering:
+    - ?ordering=name
+    - ?ordering=-created_at
     """
     serializer_class = CategorySerializer
     permission_classes = [IsAuthenticated, IsOwner]
+    
+    # Filter backends
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = CategoryFilter
+    search_fields = ['name']
+    ordering_fields = ['name', 'created_at']
+    ordering = ['name']  # Default ordering
     
     def get_queryset(self):
         """
@@ -101,8 +123,40 @@ class TaskViewSet(viewsets.ModelViewSet):
     destroy: Soft delete task
     complete: Mark task as complete
     restore: Restore soft-deleted task
+    
+    Filtering:
+    - ?status=pending
+    - ?priority=high
+    - ?category=1
+    - ?due_date_from=2026-01-01
+    - ?due_date_to=2026-12-31
+    - ?created_from=2026-01-01
+    - ?created_to=2026-12-31
+    - ?is_completed=true
+    - ?is_overdue=true
+    - ?has_category=true
+    
+    Search:
+    - ?search=meeting (searches in title and description)
+    
+    Ordering:
+    - ?ordering=created_at
+    - ?ordering=-due_date
+    - ?ordering=priority,-created_at
+    
+    Pagination:
+    - ?page=2
+    - ?page_size=20
     """
     permission_classes = [IsAuthenticated, IsOwner]
+    pagination_class = CustomPagination
+    
+    # Filter backends
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = TaskFilter
+    search_fields = ['title', 'description']
+    ordering_fields = ['created_at', 'updated_at', 'due_date', 'priority', 'status']
+    ordering = ['-created_at']  # Default ordering
     
     def get_queryset(self):
         """
