@@ -28,6 +28,7 @@ urlpatterns = [
     
     # API endpoints
     path('api/auth/', include('apps.authentication.urls')),
+    path('api/', include('apps.tasks.urls')),
     
     # API Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
