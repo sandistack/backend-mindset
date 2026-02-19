@@ -34,11 +34,11 @@ LOGGING['root']['level'] = 'DEBUG'
 LOGGING['loggers']['apps']['level'] = 'DEBUG'
 LOGGING['loggers']['django']['level'] = 'DEBUG'
 
-# Disable caching for templates in development
-TEMPLATES[0]['OPTIONS']['loaders'] = [
-    'django.template.loaders.filesystem.Loader',
-    'django.template.loaders.app_directories.Loader',
-]
+# Disable template caching in development (APP_DIRS already handles loaders)
+# TEMPLATES[0]['OPTIONS']['loaders'] = [
+#     'django.template.loaders.filesystem.Loader',
+#     'django.template.loaders.app_directories.Loader',
+# ]
 
 # Show emails in console
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

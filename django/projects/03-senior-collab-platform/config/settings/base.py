@@ -36,7 +36,7 @@ THIRD_PARTY_APPS = [
     'django_filters',
     'corsheaders',
     'django_celery_beat',
-    'drf_yasg',
+    # 'drf_yasg',  # API docs - optional, install setuptools if needed
 ]
 
 LOCAL_APPS = [
